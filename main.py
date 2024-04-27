@@ -68,7 +68,7 @@ def main():
         val_data_dir = args.val_data_dir
         project_name = args.project_name 
         train_continue = args.train_continue
-        project_dir = os.path.join('/g', 'prevedel', 'members', 'Rauscher', 'projects', 'n2v', 'N2V-standard')
+        project_dir = os.path.join('/g', 'prevedel', 'members', 'Rauscher', 'projects', 'n2v', 'N2V-OCM')
 
         print(f"Using train data directory: {train_data_dir}")
         print(f"Using val data directory: {val_data_dir}")
@@ -78,7 +78,7 @@ def main():
         # If not running on the server, perhaps use a default data_dir or handle differently
         train_data_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'data', 'big_data_small', 'OCT-data-1')
         val_data_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'data', 'big_data_small', 'OCT-data-1')
-        project_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'projects', 'N2V-standard')
+        project_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'projects', 'N2V-OCM')
         project_name = 'OCT-data-1-test_1'
         train_continue = 'off'
 

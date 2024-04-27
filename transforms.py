@@ -122,7 +122,7 @@ class RandomHorizontalFlip:
 
 
 class N2V_mask_generator:
-    def __init__(self, perc_pixel=0.198, n2v_neighborhood_radius=5):
+    def __init__(self, perc_pixel=0.156, n2v_neighborhood_radius=5):
         """
         Initializes the N2V_mask_generator with:
         - perc_pixel: Percentage of pixels to be masked.
@@ -133,9 +133,9 @@ class N2V_mask_generator:
 
     def __call__(self, slice_data):
         """
-        Apply a mask to a single-channel image, setting a specified percentage of pixels to zero,
-        and return the original image as a label.
-        
+        Apply a mask to a single-channel image by setting a specified percentage of pixels 
+        to their neighborhood values, and return the original image as a label.
+
         Args:
             slice_data (numpy.ndarray): Image to be masked, expected to be in the format (1, H, W).
 
@@ -154,10 +154,21 @@ class N2V_mask_generator:
 
         # Generate random coordinates for the mask
         coords = self.generate_random_coords(h, w, num_pix)
+        radius = self.n2v_neighborhood_radius
 
-        # Apply the mask to the image
+        # Apply the neighborhood masking
         for y, x in coords:
-            masked_image[0, y, x] = 0  # Mask pixels are set to zero
+            # Get a random neighbor within the neighborhood radius
+            dy = np.random.randint(-radius // 2, radius // 2 + 1)
+            dx = np.random.randint(-radius // 2, radius // 2 + 1)
+            ny, nx = y + dy, x + dx
+
+            # Handle boundary conditions
+            ny = min(max(ny, 0), h - 1)
+            nx = min(max(nx, 0), w - 1)
+
+            # Set the masked image pixel to the value of the neighbor
+            masked_image[0, y, x] = slice_data[0, ny, nx]
             mask[0, y, x] = 0  # Update mask to reflect masked locations
 
         return {'input': masked_image, 'label': slice_data, 'mask': mask}
@@ -179,10 +190,6 @@ class N2V_mask_generator:
         return list(zip(ys, xs))
 
 
-
-
-import torch
-import numpy as np
 
 class ToTensor(object):
     """
