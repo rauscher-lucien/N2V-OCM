@@ -68,7 +68,7 @@ def main():
         val_data_dir = args.val_data_dir
         project_name = args.project_name 
         train_continue = args.train_continue
-        project_dir = os.path.join('/g', 'prevedel', 'members', 'Rauscher', 'projects', 'n2v', 'N2V-OCM')
+        project_dir = os.path.join('/g', 'prevedel', 'members', 'Rauscher', 'projects', 'N2V-OCM')
 
         print(f"Using train data directory: {train_data_dir}")
         print(f"Using val data directory: {val_data_dir}")
@@ -76,10 +76,10 @@ def main():
         print(f"Train continue: {train_continue}")
     else:
         # If not running on the server, perhaps use a default data_dir or handle differently
-        train_data_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'data', 'big_data_small', 'OCT-data-1')
-        val_data_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'data', 'big_data_small', 'OCT-data-1')
+        train_data_dir = r"C:\Users\rausc\Documents\EMBL\data\Nematostella_B"
+        val_data_dir = r"C:\Users\rausc\Documents\EMBL\data\Nematostella_B"
         project_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'projects', 'N2V-OCM')
-        project_name = 'OCT-data-1-test_1'
+        project_name = 'Nema_B-test_1'
         train_continue = 'off'
 
 
@@ -92,7 +92,7 @@ def main():
 
     data_dict['num_epoch'] = 600
     data_dict['batch_size'] = 8
-    data_dict['lr'] = 1e-4
+    data_dict['lr'] = 1e-5
 
     data_dict['num_freq_disp'] = 1
 

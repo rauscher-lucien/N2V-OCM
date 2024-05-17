@@ -64,7 +64,7 @@ class Trainer:
 
         model.load_state_dict(dict_net['model'])
         optimizer.load_state_dict(dict_net['optimizer'])
-        epoch.load_state_dict(dict_net['epoch'])
+        epoch = dict_net['epoch']
 
         print('Loaded %dth network' % epoch)
 
@@ -127,7 +127,7 @@ class Trainer:
 
         model = NewUNet().to(self.device)
 
-        criterion = nn.MSELoss(reduction='sum').to(self.device)
+        criterion = nn.MSELoss().to(self.device)
 
         optimizer = torch.optim.Adam(model.parameters(), self.lr)
 
@@ -146,6 +146,7 @@ class Trainer:
             for batch, data in enumerate(train_loader, 0):
                 optimizer.zero_grad()
                 input_img, label, mask = data['input'].to(self.device), data['label'].to(self.device), data['mask'].to(self.device)
+                #plot_intensity_distribution(input_img, 'input')
                 output_img = model(input_img)
                 loss = criterion(output_img * (1-mask), label * (1-mask))
                 train_loss += loss.item() 
@@ -172,7 +173,7 @@ class Trainer:
             avg_train_loss = train_loss / len(train_loader)
             self.writer.add_scalar('Loss/train', avg_train_loss, epoch)
 
-            print(f'Epoch [{epoch}/{self.num_epoch}], Train Loss: {avg_train_loss:.4f}')
+            print(f'Epoch [{epoch}/{self.num_epoch}], Train Loss: {avg_train_loss:.10f}')
 
             if avg_train_loss < best_train_loss:
                 best_train_loss = avg_train_loss

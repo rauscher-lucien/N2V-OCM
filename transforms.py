@@ -39,6 +39,70 @@ class Normalize(object):
 
 
 
+class LogScale(object):
+    """
+    Apply logarithmic scaling to a single-channel image.
+
+    Args:
+        epsilon (float): A small value added to the input to avoid logarithm of zero.
+    """
+
+    def __init__(self, epsilon=1e-10):
+        self.epsilon = epsilon
+
+    def __call__(self, img):
+        """
+        Apply logarithmic scaling to a single-channel image with dimensions (1, H, W).
+
+        Args:
+            img (numpy.ndarray): Image to be transformed, expected to be in the format (1, H, W).
+
+        Returns:
+            numpy.ndarray: Logarithmically scaled image.
+        """
+        # Apply logarithmic scaling with epsilon to avoid log(0)
+        scaled_img = np.log(img + self.epsilon)
+        return scaled_img
+
+
+
+class LogScaleAndNormalize(object):
+    """
+    Apply logarithmic scaling followed by Z-score normalization to a single-channel image.
+
+    Args:
+        mean (float): Mean of the log-scaled data.
+        std (float): Standard deviation of the log-scaled data.
+        epsilon (float): A small value added to the input to avoid logarithm of zero.
+
+    """
+
+    def __init__(self, mean, std, epsilon=1e-10):
+        self.mean = mean
+        self.std = std
+        self.epsilon = epsilon
+
+    def __call__(self, img):
+        """
+        Apply logarithmic scaling followed by Z-score normalization to a single-channel image with dimensions (1, H, W).
+
+        Args:
+            img (numpy.ndarray): Image to be transformed, expected to be in the format (1, H, W).
+
+        Returns:
+            numpy.ndarray: Transformed image.
+        """
+        # Apply logarithmic scaling
+        log_scaled_img = np.log(img + self.epsilon)
+        log_scaled_mean = np.log(self.mean + self.epsilon)
+        log_scaled_std = np.log(self.std + self.epsilon)
+
+        # Normalize the log-scaled image
+        normalized_img = (log_scaled_img - log_scaled_mean) / log_scaled_std
+        return normalized_img
+
+
+
 class RandomCrop(object):
     """
     Randomly crop a single-channel image to a specified size.
@@ -313,6 +377,41 @@ class CropToMultipleOf16Video(object):
 
 
 
+class CropToMultipleOf32Inference(object):
+    """
+    Crop each slice in a stack of images to ensure their height and width are multiples of 32.
+    This is particularly useful for models that require input dimensions to be divisible by certain values.
+    """
+
+    def __call__(self, stack):
+        """
+        Args:
+            stack (numpy.ndarray): Stack of images to be cropped, with shape (Num_Slices, H, W).
+
+        Returns:
+            numpy.ndarray: Stack of cropped images.
+        """
+
+        num_slices, h, w = stack.shape
+
+        # Compute new dimensions to be multiples of 32
+        new_h = h - (h % 32)
+        new_w = w - (w % 32)
+
+        # Calculate cropping margins
+        top = (h - new_h) // 2
+        left = (w - new_w) // 2
+
+        # Generate indices for cropping
+        id_y = np.arange(top, top + new_h).astype(np.int32)
+        id_x = np.arange(left, left + new_w).astype(np.int32)
+
+        # Crop each slice in the stack
+        cropped_stack = np.zeros((num_slices, new_h, new_w), dtype=stack.dtype)
+        for i in range(num_slices):
+            cropped_stack[i] = stack[i, id_y, :][:, id_x]
+
+        return cropped_stack
 
 
 
@@ -356,3 +455,35 @@ class BackTo01Range(object):
 
 
 
+class ToTensorInference(object):
+    """
+    Convert images or batches of images to PyTorch tensors, handling both single images
+    and tuples of images (input_img, target_img). The input is expected to be in the format
+    (b, h, w, c) for batches or (h, w, c) for single images, and it converts them to
+    PyTorch's (b, c, h, w) format or (c, h, w) for single images.
+    """
+
+    def __call__(self, data):
+        """
+        Convert input images or a tuple of images to PyTorch tensors, adjusting the channel position.
+
+        Args:
+            data (numpy.ndarray or tuple of numpy.ndarray): The input can be a single image (h, w, c),
+            a batch of images (b, h, w, c), or a tuple of (input_img, target_img) in similar formats.
+
+        Returns:
+            torch.Tensor or tuple of torch.Tensor: The converted image(s) as PyTorch tensor(s) in the
+            format (c, h, w) for single images or (b, c, h, w) for batches. If input is a tuple, returns
+            a tuple of tensors.
+        """
+        def convert_image(img):
+            if img.ndim == 3:
+                return torch.from_numpy(img.astype(np.float32))
+            else:
+                raise ValueError("Unsupported image format: must be (h, w, c) or (b, h, w, c).")
+
+        # Check if the input is a tuple of images
+        if isinstance(data, tuple):
+            return tuple(convert_image(img) for img in data)
+        else:
+            return convert_image(data)

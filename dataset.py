@@ -61,6 +61,3 @@ class DatasetLoadAll(torch.utils.data.Dataset):
 
         return slice_data
 
-# Usage example remains the same as before.
-
-

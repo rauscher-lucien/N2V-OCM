@@ -108,20 +108,17 @@ def main():
         print(f"Project name: {project_name}")
     else:
         # If not running on the server, perhaps use a default data_dir or handle differently
-        data_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'data', 'big_data_small', 'OCT-data-1')
-        #data_dir = os.path.join('Z:\\', 'Members', 'Rauscher', 'data', 'big_data_small', 'OCT-data-1')
-        project_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'projects', 'FastDVDNet')
-        #project_dir = os.path.join('Z:\\', 'Members', 'Rauscher', 'projects', 'FastDVDNet')
-        project_name = 'only_two_dataset_not_similar-diff_art_noise-test_1'
-        inference_name = 'OCT-data-1'
+        data_dir = r"C:\Users\rausc\Documents\EMBL\data\big_data_small\OCT-data-1"
+        project_dir = r"C:\Users\rausc\Documents\EMBL\projects\N2V-OCM\OCT-data-1-log_test"
+        inference_name = 'inference'
 
     #********************************************************#
 
 
     #********************************************************#
 
-    results_dir = os.path.join(project_dir, project_name, 'results')
-    checkpoints_dir = os.path.join(project_dir, project_name, 'checkpoints')
+    results_dir = os.path.join(project_dir, 'results')
+    checkpoints_dir = os.path.join(project_dir, 'checkpoints')
 
     # Make a folder to store the inference
     inference_folder = os.path.join(results_dir, inference_name)
@@ -140,14 +137,14 @@ def main():
     mean, std = load_normalization_params(checkpoints_dir)
     
     inf_transform = transforms.Compose([
-        Normalize(mean, std),
-        CropToMultipleOf16Video(),
-        ToTensorVideo(),
+        LogScaleAndNormalize(mean, std),
+        CropToMultipleOf32Inference(),
+        ToTensorInference(),
     ])
 
     inv_inf_transform = transforms.Compose([
         BackTo01Range(),
-        ToNumpyVideo()
+        ToNumpy()
     ])
 
     inf_dataset = DatasetLoadAll(
@@ -165,7 +162,7 @@ def main():
     )
 
 
-    model = FastDVDnet().to(device)
+    model = NewUNet().to(device)
     model, epoch = load(checkpoints_dir, model)
 
     model = model.to(device)
@@ -180,7 +177,7 @@ def main():
         output_images = []
 
         for batch, data in enumerate(inf_loader):
-            input_stack = data[0].to(device)  # Assuming data is a tensor with shape [B, 4, H, W]
+            input_stack = data.to(device)  # Assuming data is a tensor with shape [B, 4, H, W]
 
             # Generate the output images
             output_img = model(input_stack)
@@ -196,7 +193,7 @@ def main():
 
     # Stack and save output images
     output_stack = np.stack(output_images_clipped, axis=0).squeeze(-1)  # Remove channel dimension if single channel
-    filename = f'output_stack-{project_name}-{inference_name}-epoch{epoch}.TIFF'
+    filename = f'output_stack-{inference_name}-epoch{epoch}.TIFF'
     tifffile.imwrite(os.path.join(inference_folder, filename), output_stack)
 
     print("Output TIFF stack created successfully.")
