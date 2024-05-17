@@ -7,8 +7,7 @@ from PIL import Image
 import torch
 import copy
 
-
-import numpy as np
+from utils import *
 
 class Normalize(object):
     """
@@ -288,6 +287,109 @@ class ToTensor(object):
 
 
 
+import numpy as np
+import copy
+import numpy.ma as ma
+
+class N2V_mask_generator_median(object):
+
+    def __init__(self, perc_pixel=0.198, n2v_neighborhood_radius=5):
+        self.perc_pixel = perc_pixel
+        self.local_sub_patch_radius = n2v_neighborhood_radius  # Radius for local neighborhood
+
+    @staticmethod
+    def __get_stratified_coords2D__(coord_gen, box_size, shape):
+        box_count_y = int(np.ceil(shape[1] / box_size))
+        box_count_x = int(np.ceil(shape[2] / box_size))
+        x_coords = []
+        y_coords = []
+        for i in range(box_count_y):
+            for j in range(box_count_x):
+                y, x = next(coord_gen)
+                y = int(i * box_size + y)
+                x = int(j * box_size + x)
+                if y < shape[1] and x < shape[2]:
+                    y_coords.append(y)
+                    x_coords.append(x)
+        return np.array(y_coords), np.array(x_coords)
+
+    @staticmethod
+    def __rand_float_coords2D__(boxsize):
+        while True:
+            yield np.random.rand() * boxsize, np.random.rand() * boxsize
+
+    def __call__(self, data):
+        shape = data.shape  # Determine the shape of the input data
+        assert len(shape) == 3 and shape[0] == 1, "Input data must have shape (1, height, width)"
+
+        self.dims = len(shape) - 1  # Number of spatial dimensions (excluding the channel dimension)
+
+        num_pix = int(np.product(shape[1:]) / 100.0 * self.perc_pixel)
+        assert num_pix >= 1, "Number of blind-spot pixels is below one. At least {}% of pixels should be replaced.".format(100.0 / np.product(shape[1:]))
+
+        self.box_size = np.round(np.sqrt(100 / self.perc_pixel)).astype(int)
+        self.get_stratified_coords = self.__get_stratified_coords2D__
+        self.rand_float = self.__rand_float_coords2D__(self.box_size)
+
+        label = data  # Input data as the label
+        input_data = copy.deepcopy(label)
+        mask = np.ones(label.shape, dtype=np.float32)  # Initialize mask
+
+        coords = self.get_stratified_coords(self.rand_float, box_size=self.box_size, shape=shape)
+        indexing = (np.full(coords[0].shape, 0), coords[0], coords[1])
+        indexing_mask = (np.full(coords[0].shape, 0), coords[0], coords[1])
+
+        value_manipulation = self.pm_median()
+        input_val = value_manipulation(input_data[0], coords, self.dims)
+
+        input_data[indexing] = input_val
+        mask[indexing_mask] = 0
+
+        plot_first_depth_first_channel(mask)
+
+        return {'input': input_data, 'label': label, 'mask': mask}
+
+    def pm_median(self):
+        def patch_median(patch, coords, dims):
+            patch_wo_center = self.mask_center(ndims=dims)
+            vals = []
+            for coord in zip(*coords):
+                sub_patch, crop_neg, crop_pos = self.get_subpatch(patch, coord, self.local_sub_patch_radius)
+                slices = [slice(-n, s - p) for n, p, s in zip(crop_neg, crop_pos, patch_wo_center.shape)]
+                sub_patch_mask = patch_wo_center[tuple(slices)]
+                vals.append(np.median(sub_patch[sub_patch_mask]))
+            return vals
+        return patch_median
+
+    def mask_center(self, ndims=2):
+        size = self.local_sub_patch_radius * 2 + 1
+        patch_wo_center = np.ones((size,) * ndims)
+        patch_wo_center[self.local_sub_patch_radius, self.local_sub_patch_radius] = 0
+        return ma.make_mask(patch_wo_center)
+
+    def get_subpatch(self, patch, coord, local_sub_patch_radius, crop_patch=True):
+        crop_neg, crop_pos = 0, 0
+        if crop_patch:
+            start = np.array(coord) - local_sub_patch_radius
+            end = start + local_sub_patch_radius * 2 + 1
+            crop_neg = np.minimum(start, 0)
+            crop_pos = np.maximum(0, end - patch.shape)
+            start -= crop_neg
+            end -= crop_pos
+        else:
+            start = np.maximum(0, np.array(coord) - local_sub_patch_radius)
+            end = start + local_sub_patch_radius * 2 + 1
+            shift = np.minimum(0, patch.shape - end)
+            start += shift
+            end += shift
+
+        slices = [slice(s, e) for s, e in zip(start, end)]
+        return patch[tuple(slices)], crop_neg, crop_pos
+
+# Dummy function for plotting, replace with actual plotting function if needed
+def plot_first_depth_first_channel(mask):
+    pass
+
 
 
 
@@ -305,7 +407,7 @@ class CropToMultipleOf16Inference(object):
         Returns:
             numpy.ndarray: Cropped image.
         """
-        h, w = img.shape[:2]  # Assuming img is a numpy array with shape (H, W, C) or (H, W)
+        _, h, w = img.shape  # Assuming img is a numpy array with shape (H, W, C) or (H, W)
 
         # Compute new dimensions to be multiples of 16
         new_h = h - (h % 16)
@@ -320,7 +422,7 @@ class CropToMultipleOf16Inference(object):
         id_x = np.arange(left, left + new_w, 1).astype(np.int32)
 
         # Crop the image
-        cropped_image = img[id_y, id_x]
+        cropped_image = img[:, id_y, id_x]
 
         return cropped_image
 
@@ -487,3 +589,42 @@ class ToTensorInference(object):
             return tuple(convert_image(img) for img in data)
         else:
             return convert_image(data)
+        
+
+class Denormalize(object):
+    """
+    Denormalize an image using mean and standard deviation, then convert it to 16-bit format.
+    
+    Args:
+        mean (float or tuple): Mean for each channel.
+        std (float or tuple): Standard deviation for each channel.
+    """
+
+    def __init__(self, mean, std):
+        """
+        Initialize with mean and standard deviation.
+        
+        Args:
+            mean (float or tuple): Mean for each channel.
+            std (float or tuple): Standard deviation for each channel.
+        """
+        self.mean = mean
+        self.std = std
+    
+    def __call__(self, img):
+        """
+        Denormalize the image and convert it to 16-bit format.
+        
+        Args:
+            img (numpy array): Normalized image.
+        
+        Returns:
+            numpy array: Denormalized 16-bit image.
+        """
+        # Denormalize the image by reversing the normalization process
+        img_denormalized = (img * self.std) + self.mean
+
+        # Scale the image to the range [0, 65535] and convert to 16-bit unsigned integer
+        img_16bit = img_denormalized.astype(np.uint16)
+        
+        return img_16bit

@@ -86,7 +86,7 @@ class Trainer:
             Normalize(mean, std),
             RandomCrop(output_size=(64,64)),
             RandomHorizontalFlip(),
-            N2V_mask_generator(),
+            N2V_mask_generator_median(),
             ToTensor()
         ])
 

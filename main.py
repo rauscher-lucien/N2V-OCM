@@ -79,7 +79,7 @@ def main():
         train_data_dir = r"C:\Users\rausc\Documents\EMBL\data\Nematostella_B"
         val_data_dir = r"C:\Users\rausc\Documents\EMBL\data\Nematostella_B"
         project_dir = os.path.join('C:\\', 'Users', 'rausc', 'Documents', 'EMBL', 'projects', 'N2V-OCM')
-        project_name = 'Nema_B-test_1'
+        project_name = 'Nema_B-test_2'
         train_continue = 'off'
 
 

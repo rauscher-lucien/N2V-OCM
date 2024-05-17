@@ -107,10 +107,10 @@ def main():
         print(f"Using data directory: {data_dir}")
         print(f"Project name: {project_name}")
     else:
-        # If not running on the server, perhaps use a default data_dir or handle differently
-        data_dir = r"C:\Users\rausc\Documents\EMBL\data\big_data_small\OCT-data-1"
-        project_dir = r"C:\Users\rausc\Documents\EMBL\projects\N2V-OCM\OCT-data-1-log_test"
-        inference_name = 'inference'
+        project_dir = r"Z:\members\Rauscher\projects\N2V-OCM\Nema_B-test_2"
+        data_dir = r"Z:\members\Rauscher\data\big_data_small-test\Nematostella_B"
+        project_name = os.path.basename(project_dir)
+        inference_name = os.path.basename(data_dir)
 
     #********************************************************#
 
@@ -137,14 +137,14 @@ def main():
     mean, std = load_normalization_params(checkpoints_dir)
     
     inf_transform = transforms.Compose([
-        LogScaleAndNormalize(mean, std),
-        CropToMultipleOf32Inference(),
+        Normalize(mean, std),
+        CropToMultipleOf16Inference(),
         ToTensorInference(),
     ])
 
     inv_inf_transform = transforms.Compose([
-        BackTo01Range(),
-        ToNumpy()
+        ToNumpy(),
+        Denormalize(mean, std),
     ])
 
     inf_dataset = DatasetLoadAll(
@@ -188,12 +188,9 @@ def main():
 
             print(f'BATCH {batch+1}/{len(inf_loader)}')
 
-    # Clip output images to the 0-1 range
-    output_images_clipped = [np.clip(img, 0, 1) for img in output_images]
-
     # Stack and save output images
-    output_stack = np.stack(output_images_clipped, axis=0).squeeze(-1)  # Remove channel dimension if single channel
-    filename = f'output_stack-{inference_name}-epoch{epoch}.TIFF'
+    output_stack = np.stack(output_images, axis=0).squeeze(-1)  # Remove channel dimension if single channel
+    filename = f'output_stack-{project_name}-{inference_name}-epoch{epoch}.TIFF'
     tifffile.imwrite(os.path.join(inference_folder, filename), output_stack)
 
     print("Output TIFF stack created successfully.")

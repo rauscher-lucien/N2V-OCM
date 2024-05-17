@@ -381,3 +381,16 @@ def print_tiff_filenames(root_folder_path):
         sorted_files = sorted([f for f in files if f.lower().endswith(('.tif', '.tiff'))])
         for filename in sorted_files:
             print(filename)
+
+
+def plot_first_channel(array, figsize=(10, 10)):
+
+    # Extract the slice at depth position 0 and channel 0
+    first_slice = array[0, :, :]
+
+    # Create a figure with the specified size
+    plt.figure(figsize=figsize)
+    plt.imshow(first_slice, cmap='gray')
+    plt.title("figure")
+    plt.axis('off')
+    plt.show()
